@@ -16,66 +16,88 @@
 #include <unistd.h>	/* close() */
 #include <sys/types.h>	
 #include <sys/stat.h>	
+#include <iostream>
 
 using namespace std;
 
 //структура для передачи аргументов потоку
 struct argStruct{
 
-    int fd;           //дескриптор файла
     string str;       //строка
+    int fd;           //дескриптор файла
+    //конструктор с аргументами
+    argStruct(string str, int fd): fd(fd), str(str) {};
+    //конструктор по умолчанию
+    argStruct() {};
+
 };
 //функция, которую будет выполнять поток по нечетным строкам
-void* threadFuncOdd(void* args){
+static void* threadFuncOdd(void* args){
     //приведение аргументов к необходимому типу argStruct
-    argStruct* arg = (argStruct*) args;
+    argStruct arg = *((argStruct*) args);
     //записываем в файл с дескриптором fd строку str с длиной str.length()
-    write(arg->fd,(arg->str).c_str(),arg->str.length());
-    return 0;
+    write(arg.fd,(arg.str).c_str(),(arg.str).length());
+    //завершаем работу нити
+    pthread_exit(0);
 
 }
 
 //функция, которую будет выполнять поток по четным строкам
-void* threadFuncEven(void* args){
+static void* threadFuncEven(void* args){
     //приведение аргументов к необходимому типо argStruct
-    argStruct* arg = (argStruct*) args;
+    argStruct arg = *((argStruct*) args);
     //Записываем в файл с дескриптором fd строку str с длиной str.length()
-    write(arg->fd, (arg->str).c_str(), arg->str.length());
-    return 0;
+    write(arg.fd, (arg.str).c_str(), (arg.str).length());
+    //завершаем работу нити
+    pthread_exit(0);
 
 }
-
+ 
 int main(){
-    string str;              //считываемая строка с файла
-    pthread_t threads[2];    //массив потоков, содержит два потока
-    argStruct arg;           //передаваемый аргумент функциям потоков
+    pthread_t threadOdd,      //1 поток
+              threadEven;     //2 поток
+    pthread_attr_t attr;      //атрибуты потоков
+    pthread_attr_init(&attr); //инициализируем атрибуты
     //открываем файл mainFile.txt, из которого будем считывать строчки
     ifstream mainFile("mainFile.txt");
     //создаем файлы для потоков, возвращается дескрипторы открытых файлов
     int fdOdd = open("oddFile.txt", O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH );
     int fdEven = open("evenFile.txt", O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH);
-    //пока файл не пуст считываем каждую строку 
-    for(int i = 1; getline(mainFile, str); i++){
-        //добавляем к строке символ переноса строки для удобств
-            arg.str = str+'\n';
-            //если считывается нечетная по порядку строка
-            if((i % 2) == 1){
-                //записываем дескриптор файла для потока
-                arg.fd= fdOdd;
-                //создаем поток, который запустит функцию threadFuncOdd с аргументами arg
-                pthread_create(&threads[0], NULL, threadFuncOdd, (void*) &arg);
-            }
-            //если считывается четная по порядку строка
-            else if((i %2) == 0){
-                //создаем поток, который запустит функцию threadFuncEven с аргументами arg
-                arg.fd = fdEven;
-                pthread_create(&threads[1],NULL, threadFuncEven, (void*) &arg);
-            }
-            //приостанавливаем основной процесс, пока потоки не завершатся
-             pthread_join(threads[0], NULL);
-             pthread_join(threads[1], NULL);
+    //объявляем статические переменные аргументов функций потоков
+    static argStruct arg1, arg2;
+    //флаги завершения чтения файла, если файл содержит четное количество строк или нечетное
+    bool isNotEndOdd = true;
+    bool isNotEndEven = true;
+    //пока не достигнут конец файла
+    while((isNotEndEven && isNotEndOdd)){
+        //переменные, куда будут записываться строки из файла
+        string str1, str2;
+        //считываем строку по нечетному порядку
+        if(getline(mainFile,str1)){
+            //присваиваем аргументы функции - строка и дескриптор файла
+            arg1 = argStruct(str1+"\n",fdOdd);
+            //создаем нить, которая выполнит функцию threadFuncOdd с аргументами arg1
+            pthread_create(&threadOdd, &attr, &threadFuncOdd, &arg1);  
+         }
+         else{ //если чтение не удалось - значит достигли конца файла
+             isNotEndOdd = false;
+         } //считываем четную по порядку строку
+         if(getline(mainFile,str2)){
+             //присваиваем аргументы функции - строка и дескриптор файла
+            arg2 = argStruct(str2+"\n",fdEven);
+            //создаем нить, которая выполнит функцию threadFuncEven с аргументами arg2
+            pthread_create(&threadEven, &attr, &threadFuncEven, &arg2);
+         }
+         else{ //если чтение не удалось - достигл конца файла
+             isNotEndEven = false;
+         }
+         //приостанавливаем основный процесс, пока потоки не завершатся
+        pthread_join(threadOdd, NULL);
+        pthread_join(threadEven, NULL);
     }
-    //закрываем все файлы
+    //удаляем аттрибуты потоков
+    pthread_attr_destroy(&attr);
+    //закрываем все файла
     mainFile.close();
     close(fdOdd);
     close(fdEven);
