@@ -13,11 +13,11 @@
 #include <unistd.h>	/* close() */
 #include <iostream>
 #include <pthread.h>
+#include <errno.h>
 #include "sched.h"
 //структура для передачи аргументов потоку
 struct argStruct{
     int fd;          //дескриптор файла
-    bool isClosed;   //факт закрытия файла
 };
 //функция, которую будет выполнять поток
 void* threadFunc(void* args){
@@ -61,9 +61,7 @@ void* threadFunc(void* args){
 		putchar (ch);
 	}
     //закрываем файл
-    if (close(arg->fd) != -1){
-        arg->isClosed = true;
-    }
+  //  close(arg->fd);
     return 0;
 }
 //главная функция
@@ -80,7 +78,6 @@ int main(){
     int fd = open(nameFile, O_RDONLY);
     //заполняем структуру для передачи данных в поток
     arg.fd = fd;
-    arg.isClosed = false;
     //создаем поток с выполнением функции threadFunc с аргументами arg
     status = pthread_create(&thread, NULL, threadFunc, (void*) &arg);
     //Если поток создать не удалось выводим ошибку
@@ -95,16 +92,16 @@ int main(){
         exit(-12);
     }
     printf("\nТекущий статический приоритет процесса: %d\n",getpriority(PRIO_PROCESS,getpid()));
-    //после завершения дочернего потока структура могла измениться
-    //если поток закрыл файл, то поле isClosed true, иначе false
-    if(!arg.isClosed){
+    //с помощью fcntl пытаемся получить флаги дескриптора fd, если произошла ошибка функция вернет -1 и 
+    //сгенерируется ошибка, что fd не является открытым дескриптором
+    if(fcntl(fd, F_GETFD) != -1 || errno != EBADF){
         //если поток не закрыл файл - главный процесс должен его закрыть
         if(close(fd) != -1){
-            printf("Файл не был закрыт потоком, но теперь он закрыт\n");
+            printf("Файл не был закрыт потоком, но теперь он закрыт родительским процессом\n");
         }
     }
     else {
-        printf("Файл был успешно закрыт\n");
+        printf("Файл был успешно закрыт потоком\n");
     }
 
 }
