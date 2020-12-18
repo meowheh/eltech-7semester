@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
 
     int msgId;
 	if((msgId = msgget(KEY, IPC_CREAT|IPC_EXCL))!= -1){
-		cout<< "Другая программа не запущена!\n"<<endl;
+		cout<< "Первая программа не запущена!\n"<<endl;
 		msgctl(msgId, IPC_RMID, 0);
 		return 0;
 	}
@@ -43,7 +43,6 @@ int main(int argc, char *argv[]) {
     	cout<< "Сообщение не отправлено" << endl;
     	perror("msgsnd");
     }
-
 
     return 0;
 }

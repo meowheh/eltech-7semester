@@ -18,6 +18,7 @@ int main(int argc, char* argv[])
 				write(*argv[1], &s[0], strlen(s.c_str()));
 			}
 			file.close();
+			close(*argv[1]);
 		}
 
     exit(EXIT_SUCCESS);

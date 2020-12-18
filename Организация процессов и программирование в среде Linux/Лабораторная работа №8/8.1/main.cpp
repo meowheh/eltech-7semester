@@ -7,44 +7,60 @@
 #include <iostream>
 #include <sys/msg.h>
 #include <sys/ipc.h>
+#include <sys/time.h>
 #include <cstring>
 #include <iomanip>
 #include <sys/types.h>
 #include <unistd.h>
 #include <assert.h>
+#include <signal.h>
 
 using namespace std;
 const int KEY = 646;
-
+int msgId;
 struct myMsgbuf {
     long mtype;   /* тип сообщения, должен быть > 0 */
     int mtext;        /* содержание сообщения */
 };
 
+void signal_handler(int signum) {
+    if (signum == SIGALRM) {
+        msgctl(msgId, IPC_RMID, 0);
+        exit(0);
+    }
+}
+
 int main(int argc, char *argv[]) {
 
     assert(argc == 2);
-
+    signal(SIGALRM, signal_handler);
 	int waitTime = atoi(argv[1]);
 	myMsgbuf message;
 
     //разрешен прием сообщений пользователю, владеющему очередью и
     //разрешена передача сообщений всем остальным пользователям
-	int msgId = msgget(KEY, 402|IPC_CREAT);
+	msgId = msgget(KEY, 402|IPC_CREAT);
 	if(msgId == -1){
 		cout<<"Ошибка создания очереди!\n" << endl;
 		return 0;
 	}
-    for(int timer = waitTime; timer > 0; --timer)
+    struct itimerval value, ovalue;
+	
+	// период перезапуска по умолчанию
+	value.it_interval.tv_sec = 0;
+	value.it_interval.tv_usec = 0;
+	// Первый запуск программы через waitTime сек
+	value.it_value.tv_sec = waitTime;
+	value.it_value.tv_usec = 0;
+	
+	// Устанавливаем интервальный таймер
+	setitimer(ITIMER_REAL, &value, &ovalue);
+    for(;;)
     {
-        if( msgrcv(msgId, &message, sizeof(myMsgbuf), 1, IPC_NOWAIT) != -1){
+        if( msgrcv(msgId, &message, sizeof(myMsgbuf), 0, 0) != -1){
 	    	cout<< "Сообщение: " << message.mtext << endl;
-            timer = message.mtext;
+            value.it_value.tv_sec = message.mtext;
+            setitimer(ITIMER_REAL, &value, &ovalue);
         }
-        sleep(1);
     }
-
-    msgctl(msgId, IPC_RMID, 0);
-
-	return 0;
 }

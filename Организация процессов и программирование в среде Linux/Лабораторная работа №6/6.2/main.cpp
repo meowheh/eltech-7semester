@@ -41,16 +41,11 @@ void signal_handler(int signum) {
     }
 }
 
-
+//argv[1] - количество запусков; argv[2] - время между запусками 
 int main(int argc, char* argv[]) {
     
-    struct sigaction act;
-	act.sa_handler = signal_handler;
-    sigemptyset(&act.sa_mask);
-    act.sa_flags = SA_RESTART;
-    sigaction(SIGALRM, &act, NULL);
-    sigaction(SIGTSTP, &act, NULL);
-
+    signal(SIGALRM,signal_handler);
+    signal(SIGTSTP, SIG_IGN);
 
     time_t start, end;
     inparam param;
@@ -63,17 +58,18 @@ int main(int argc, char* argv[]) {
     }
     time(&start);
     struct itimerval value, ovalue;
+    //устанавливаем период для первого запуска
     value.it_value.tv_sec = param.tv_sec;
     value.it_value.tv_usec = 0;
+    //Устанавливаем период по умолчанию перезапуска
     value.it_interval.tv_sec = param.tv_sec;
     value.it_interval.tv_usec = 0;
+
     setitimer(ITIMER_REAL, &value, &ovalue);
-    for (;;){
+    int status;
+    for(int count = 0; count < param.run_counts; count++){
 		pause();
-        wait(NULL);
-        if (g_current_counts == param.run_counts) {
-            break;
-        }
+     //   waitpid(0, &status, 0);
 	}
     
     time(&end);
