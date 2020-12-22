@@ -54,56 +54,41 @@ int main(int argc, char* argv[]) {
     }
 
     shared_var = (shared*)shmaddr;
-    time_t t;
-    tm* current_time;
+   
     counter = 0;
 
-    while (1) {
-        /* Период записи */
-        sleep(period);
-        t = time(NULL);
-        current_time = localtime(&t);
-        printf("Программа №%d. Процесс готовится ко входу в критическую секцию. Время: %s\n",NUM+1, asctime(current_time));
-        lock();
+   while (counter < count_str) {
 
-        /* Критическая секция */
-        if (counter < count_str) 
-        {
+        lock();
+        printf("%d. Программа №%d. Процесс готовится ко входу в критическую секцию.\n", counter + 1, NUM + 1);
+      
             file.open("file.txt", std::ios::out | std::ios::app);
             if(!file)
             {
                 perror("open file");
                 exit(EXIT_FAILURE);
             }
-            t = time(NULL);
-            current_time = localtime(&t);
-            file << counter+1 << ". Программа №" << NUM+1 << ". Время: " << asctime(current_time) << std::endl;
+            file << counter + 1 << ". Программа №" << NUM + 1 << std::endl;
             file.close();
-            counter++;            
-        
-        } 
-        else 
-        {
-            (shared_var->stop)++;
-            shared_var->number[NUM] = 0;
-            break;
-        }
 
-        shared_var->number[NUM] = 0;
-        t = time(NULL);
-        current_time = localtime(&t);
-        printf("Программа №%d.Процесс вышел из критической секции.Время: %s\n",NUM+1,asctime(current_time));
+            shared_var->number[NUM] = 0;
+
+            printf("%d. Программа №%d. Процесс вышел из критической секции.\n",counter + 1, NUM+1 );
+            counter++;  
+            sleep(period);       
     }
+
+    (shared_var->stop)++;
+    shared_var->number[NUM] = 0;
     if (shared_var->stop == NUM_PROCESS) {
-        file.close();
         if (shmdt(shmaddr) == -1) 
         {
             perror("und_shm -> shmdt");
         }
         if (shmctl(id_shm, IPC_RMID, NULL) == -1) 
         {
-            perror("dest_shm -> shmctl+IPC_RMID");
-        }
+             perror("dest_shm -> shmctl+IPC_RMID");
+        }   
     }
 
     return EXIT_SUCCESS;
@@ -129,10 +114,8 @@ void lock() {
                                         max(shared_var->number[1], shared_var->number[2]));
     shared_var->choosing[NUM] = 0;
     for (int j = 0; j < NUM_PROCESS; ++j) {
-      //  if (j != NUM) {
             while (shared_var->choosing[j]);
             while (shared_var->number[j] != 0 && less(shared_var->number[j], j, shared_var->number[NUM],NUM));
-      //  }
     }
     /* Критическая секция */
 }
