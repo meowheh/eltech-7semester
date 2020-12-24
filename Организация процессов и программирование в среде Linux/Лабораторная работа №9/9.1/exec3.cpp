@@ -18,21 +18,15 @@ struct shared {
     int stop;
 };
 
-int open_file();
-int close_file();
-/* Полное уничтожение разделяемого сегмента */
-int dest_shm(int);
-int und_shm(void* shmaddr);
-
 std::ofstream file;
 
-int id_shm = -1;
-//Алгоритм Петерсона
+//Алгоритм Булочной
 void lock();
 
 shared* shared_var;
 /* argv[1] - количество строк, argv[2] - период записи */
 int main(int argc, char* argv[]) {
+    int id_shm = -1;
     void* shmaddr = NULL; /* Указатель на виртуальный адрес */
     int count_str, period, counter;
 
@@ -61,20 +55,20 @@ int main(int argc, char* argv[]) {
         lock();
         printf("%d. Программа №%d. Процесс готовится ко входу в критическую секцию.\n", counter + 1, NUM + 1);
       
-            file.open("file.txt", std::ios::out | std::ios::app);
-            if(!file)
-            {
-                perror("open file");
-                exit(EXIT_FAILURE);
-            }
-            file << counter + 1 << ". Программа №" << NUM + 1 << std::endl;
-            file.close();
+        file.open("file.txt", std::ios::out | std::ios::app);
+        if(!file)
+        {
+            perror("open file");
+            exit(EXIT_FAILURE);
+        }
+        file << counter + 1 << ". Программа №" << NUM + 1 << std::endl;
+        file.close();
 
-            shared_var->number[NUM] = 0;
+        shared_var->number[NUM] = 0;
 
-            printf("%d. Программа №%d. Процесс вышел из критической секции.\n",counter + 1, NUM+1 );
-            counter++;  
-            sleep(period);       
+        printf("%d. Программа №%d. Процесс вышел из критической секции.\n",counter + 1, NUM+1 );
+        counter++;  
+        sleep(period);       
     }
     (shared_var->stop)++;
     shared_var->number[NUM] = 0;

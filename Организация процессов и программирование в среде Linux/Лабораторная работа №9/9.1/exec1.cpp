@@ -12,44 +12,37 @@
 #include <unistd.h>
 #include <time.h>
 #include <fstream>
+#include <assert.h>
 
 const int KEY = 128,
-        NUM_PROCESS = 3,
+        NUM_PROCESSES = 3,
         NUM = 0;
 
 struct shared {
-    int choosing[NUM_PROCESS];
-    int number[NUM_PROCESS];
+    int choosing[NUM_PROCESSES];
+    int number[NUM_PROCESSES];
     int stop;
 };
 
-int open_file();
-int close_file();
-/* Полное уничтожение разделяемого сегмента */
-int dest_shm(int);
-int und_shm(void* shmaddr);
-
 std::ofstream file;
 
-int id_shm = -1;
-//Алгоритм Петерсона
+//Алгоритм Булочной
 void lock();
 
 shared* shared_var;
 /* argv[1] - количество строк, argv[2] - период записи */
 int main(int argc, char* argv[]) {
+
+    int id_shm;
     void* shmaddr = NULL; /* Указатель на виртуальный адрес */
     int count_str, period, counter;
+    assert(argc == 3);
 
-    if (argc != 3) {
-        exit(EXIT_FAILURE);
-    } else {
-        count_str = atoi(argv[1]);
-        period = atoi(argv[2]);
-    }
+    count_str = atoi(argv[1]);
+    period = atoi(argv[2]);
     //запрос на разделяемый сегмент памяти
     if ((id_shm = shmget((key_t)KEY, sizeof(shared), (0666 | IPC_CREAT))) == -1) {
-        perror("req_shm -> shmget");
+        perror("shmget");
         return -1;
     }
     //включение разделяемой памяти в пространство процесса
@@ -61,6 +54,7 @@ int main(int argc, char* argv[]) {
     shared_var = (shared*)shmaddr;
    
     counter = 0;
+
     while (counter < count_str) {
         lock();
      
@@ -81,16 +75,20 @@ int main(int argc, char* argv[]) {
             counter++;  
             sleep(period);       
     }
+
     (shared_var->stop)++;
     shared_var->number[NUM] = 0;
-    if (shared_var->stop == NUM_PROCESS) {
+
+    if (shared_var->stop == NUM_PROCESSES) {
+        //отсоединение сегмента
         if (shmdt(shmaddr) == -1) 
         {
-            perror("und_shm -> shmdt");
+            perror("shmdt");
         }
+        //удаление сегмента
         if (shmctl(id_shm, IPC_RMID, NULL) == -1) 
         {
-            perror("dest_shm -> shmctl+IPC_RMID");
+            perror("shmctl+IPC_RMID");
         }
     }
     return EXIT_SUCCESS;
@@ -109,14 +107,16 @@ bool less(int a, int b, int c, int d)
         return true;
     return false;
 }
-//Алгоритм Пекарни
+//Алгоритм булочной
 void lock() {
     shared_var->choosing[NUM] = 1;
     shared_var->number[NUM] = 1 + max(shared_var->number[0], 
                                         max(shared_var->number[1], shared_var->number[2]));
     shared_var->choosing[NUM] = 0;
-    for (int j = 0; j < NUM_PROCESS; ++j) {
+    for (int j = 0; j < NUM_PROCESSES; ++j) {
+            //ждем пока поток j получит свой номер
             while (shared_var->choosing[j]);
+            //ждем пока все потоки с меньшим номером или с таким же номером, но с более высоким приоритетом, закончат свою работу
             while (shared_var->number[j] != 0 && less(shared_var->number[j], j, shared_var->number[NUM],NUM));
     }
     /* Критическая секция */

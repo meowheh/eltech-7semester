@@ -18,21 +18,15 @@ struct shared {
     int stop;
 };
 
-int open_file();
-int close_file();
-/* Полное уничтожение разделяемого сегмента */
-int dest_shm(int);
-int und_shm(void* shmaddr);
-
 std::ofstream file;
 
-int id_shm = -1;
-//Алгоритм Петерсона
+//Алгоритм Булочной
 void lock();
 
 shared* shared_var;
 /* argv[1] - количество строк, argv[2] - период записи */
 int main(int argc, char* argv[]) {
+    int id_shm = -1;
     void* shmaddr = NULL; /* Указатель на виртуальный адрес */
     int count_str, period, counter;
 

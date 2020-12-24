@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
     int status;
     for(int count = 0; count < param.run_counts; count++){
 		pause();
-     //   waitpid(0, &status, 0);
+        waitpid(0, &status, 0);
 	}
     
     time(&end);
